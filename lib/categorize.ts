@@ -78,6 +78,7 @@ export function categorize(
         existing.snippet = email.snippet;
       }
       existing.emailIds.push(email.id);
+      existing.emails.push(email);
     } else {
       senderMap.set(email.fromAddress, {
         domain: email.fromDomain,
@@ -90,6 +91,7 @@ export function categorize(
         listUnsubscribe: email.listUnsubscribe,
         isUnsubscribed: email.labelIds.includes("inbox-zero/unsubscribed"),
         emailIds: [email.id],
+        emails: [email],
       });
     }
   }

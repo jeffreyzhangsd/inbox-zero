@@ -1,13 +1,14 @@
-// components/inbox/SenderRow.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import type { Sender } from "@/types";
+import { decodeEntities, timeAgo } from "@/lib/format";
 
 interface SenderRowProps {
   sender: Sender;
   selected: boolean;
   onSelect: (domain: string, checked: boolean) => void;
+  onExpand: (sender: Sender) => void;
   onMarkRead: (emailIds: string[]) => void;
   onUnsubscribe: (sender: Sender) => void;
   onArchive: (emailIds: string[]) => void;
@@ -15,38 +16,11 @@ interface SenderRowProps {
   onMarkSpam: (emailIds: string[]) => void;
 }
 
-function decodeEntities(str: string): string {
-  return str
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
-}
-
-function timeAgo(ts: number): string {
-  const now = Date.now();
-  const diffMs = now - ts;
-  const diffMin = Math.floor(diffMs / 60_000);
-  const diffHr = Math.floor(diffMs / 3_600_000);
-  const diffDay = Math.floor(diffMs / 86_400_000);
-
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin}m`;
-  if (diffHr < 24) return `${diffHr}h`;
-  if (diffDay < 7) return `${diffDay}d`;
-
-  return new Date(ts).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
-}
-
 export default function SenderRow({
   sender,
   selected,
   onSelect,
+  onExpand,
   onMarkRead,
   onUnsubscribe,
   onArchive,
@@ -108,7 +82,14 @@ export default function SenderRow({
         aria-label={`Select ${sender.displayName}`}
       />
 
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div
+        style={{ flex: 1, minWidth: 0, cursor: "pointer" }}
+        onClick={() => onExpand(sender)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === "Enter" && onExpand(sender)}
+        aria-label={`View emails from ${sender.displayName}`}
+      >
         <div
           style={{
             display: "flex",

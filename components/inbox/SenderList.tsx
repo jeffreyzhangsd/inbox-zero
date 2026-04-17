@@ -9,6 +9,7 @@ import BulkActionBar from "./BulkActionBar";
 
 interface SenderListProps {
   senders: Sender[];
+  onExpand: (sender: Sender) => void;
   onMarkRead: (emailIds: string[]) => void;
   onUnsubscribe: (sender: Sender) => void;
   onArchive: (emailIds: string[]) => void;
@@ -19,6 +20,7 @@ interface SenderListProps {
 
 export default function SenderList({
   senders,
+  onExpand,
   onMarkRead,
   onUnsubscribe,
   onArchive,
@@ -193,6 +195,7 @@ export default function SenderList({
               sender={sender}
               selected={selectedDomains.has(sender.domain)}
               onSelect={handleSelect}
+              onExpand={onExpand}
               onMarkRead={onMarkRead}
               onUnsubscribe={onUnsubscribe}
               onArchive={onArchive}

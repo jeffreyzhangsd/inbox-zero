@@ -1,15 +1,18 @@
 // components/inbox/InboxLayout.tsx
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
-import Link from "next/link";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
-import type { GroupedInbox, Category, Sender } from "@/types";
+import type { GroupedInbox, Category, Sender, Email } from "@/types";
+import { categorize } from "@/lib/categorize";
 import Sidebar from "./Sidebar";
 import SenderList from "./SenderList";
+import EmailDetail from "./EmailDetail";
+import SettingsModal from "./SettingsModal";
 import ThemeToggle from "@/components/ThemeToggle";
 
-// Fix 4: Lift constant style objects to module level
+const EMPTY_INBOX: GroupedInbox = { categories: [], total: 0, totalUnread: 0 };
+
 const outerContainerStyle: React.CSSProperties = {
   display: "flex",
   flex: 1,
@@ -24,7 +27,7 @@ const innerContainerStyle: React.CSSProperties = {
   position: "relative",
 };
 
-const loadingBannerStyle: React.CSSProperties = {
+const bannerBase: React.CSSProperties = {
   position: "absolute",
   top: 0,
   left: 0,
@@ -34,34 +37,55 @@ const loadingBannerStyle: React.CSSProperties = {
   borderBottom: "1px solid var(--border)",
   padding: "6px 12px",
   fontSize: "11px",
-  color: "var(--text-muted)",
   textAlign: "center",
 };
 
-const errorBannerStyle: React.CSSProperties = {
-  position: "absolute",
-  top: 0,
-  left: 0,
-  right: 0,
-  zIndex: 10,
-  background: "var(--bg-container)",
-  borderBottom: "1px solid var(--border)",
-  padding: "6px 12px",
-  fontSize: "11px",
-  color: "var(--color-error, #c0392b)",
-  textAlign: "center",
-};
-
-interface InboxLayoutProps {
-  initialData: GroupedInbox;
-}
-
-export default function InboxLayout({ initialData }: InboxLayoutProps) {
-  const [data, setData] = useState<GroupedInbox>(initialData);
+export default function InboxLayout() {
+  const [data, setData] = useState<GroupedInbox>(EMPTY_INBOX);
   const [activeCategory, setActiveCategory] = useState<Category | "all">("all");
+  const [expandedSender, setExpandedSender] = useState<Sender | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // streaming state
+  const allEmailsRef = useRef<Email[]>([]);
+  const streamDoneRef = useRef(false);
+  const [streamLoaded, setStreamLoaded] = useState(0);
+  const [streamDone, setStreamDone] = useState(false);
+
   const { data: session } = useSession();
+
+  // Initial progressive load via SSE
+  useEffect(() => {
+    const es = new EventSource("/api/emails/stream");
+
+    es.onmessage = (e: MessageEvent) => {
+      const msg = JSON.parse(e.data as string);
+
+      if (msg.type === "batch") {
+        const emails = msg.emails as Email[];
+        allEmailsRef.current.push(...emails);
+        setStreamLoaded(allEmailsRef.current.length);
+        setData(categorize(allEmailsRef.current));
+      } else if (msg.type === "done") {
+        streamDoneRef.current = true;
+        setStreamDone(true);
+        es.close();
+      } else if (msg.type === "error") {
+        setError(msg.message as string);
+        es.close();
+      }
+    };
+
+    es.onerror = () => {
+      if (!streamDoneRef.current)
+        setError("Failed to connect to email stream.");
+      es.close();
+    };
+
+    return () => es.close();
+  }, []);
 
   const activeSenders: Sender[] = useMemo(() => {
     if (activeCategory === "all") {
@@ -79,7 +103,6 @@ export default function InboxLayout({ initialData }: InboxLayoutProps) {
     );
   }, [data, activeCategory]);
 
-  // Fix 2: useCallback; Fix 1: handle network errors gracefully
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -154,7 +177,6 @@ export default function InboxLayout({ initialData }: InboxLayoutProps) {
     [loadData, applyMarkRead],
   );
 
-  // Fix 2: useCallback
   const handleSearch = useCallback(
     async (q: string) => {
       if (!q.trim()) {
@@ -180,28 +202,23 @@ export default function InboxLayout({ initialData }: InboxLayoutProps) {
     [loadData],
   );
 
-  // Fix 3: delegate to callAction; Fix 2: useCallback
   const handleMarkRead = useCallback(
     (emailIds: string[]) => callAction("markRead", emailIds),
     [callAction],
   );
-
   const handleArchive = useCallback(
     (emailIds: string[]) => callAction("archive", emailIds),
     [callAction],
   );
-
   const handleDelete = useCallback(
     (emailIds: string[]) => callAction("delete", emailIds),
     [callAction],
   );
-
   const handleMarkSpam = useCallback(
     (emailIds: string[]) => callAction("spam", emailIds),
     [callAction],
   );
 
-  // Fix 1 & 2: handleUnsubscribe stays separate (different endpoint); try/catch + res.ok + useCallback
   const handleUnsubscribe = useCallback(
     async (sender: Sender) => {
       setLoading(true);
@@ -251,15 +268,28 @@ export default function InboxLayout({ initialData }: InboxLayoutProps) {
           background: "var(--bg)",
         }}
       >
-        <span
-          style={{
-            fontSize: "12px",
-            color: "var(--text-muted)",
-            letterSpacing: "1px",
-          }}
-        >
-          inbox zero
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <span
+            style={{
+              fontSize: "12px",
+              color: "var(--text-muted)",
+              letterSpacing: "1px",
+            }}
+          >
+            inbox zero
+          </span>
+          {!streamDone && !error && (
+            <span
+              style={{
+                fontSize: "11px",
+                color: "var(--text-muted)",
+                opacity: 0.7,
+              }}
+            >
+              {`loading… ${streamLoaded} emails`}
+            </span>
+          )}
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           {session?.user?.email && (
             <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
@@ -267,12 +297,20 @@ export default function InboxLayout({ initialData }: InboxLayoutProps) {
             </span>
           )}
           <ThemeToggle />
-          <Link
-            href="/settings"
-            style={{ fontSize: "11px", color: "var(--text-muted)" }}
+          <button
+            type="button"
+            onClick={() => setShowSettings(true)}
+            style={{
+              border: "none",
+              background: "none",
+              fontSize: "11px",
+              color: "var(--text-muted)",
+              cursor: "pointer",
+              padding: 0,
+            }}
           >
             settings
-          </Link>
+          </button>
         </div>
       </div>
 
@@ -286,29 +324,52 @@ export default function InboxLayout({ initialData }: InboxLayoutProps) {
         />
 
         <div style={innerContainerStyle}>
-          {/* Fix 5: role="status" + aria-live="polite" on loading banner */}
           {loading && (
-            <div style={loadingBannerStyle} role="status" aria-live="polite">
+            <div
+              style={{ ...bannerBase, color: "var(--text-muted)" }}
+              role="status"
+              aria-live="polite"
+            >
               Loading…
             </div>
           )}
-          {/* Fix 1: error banner */}
           {!loading && error && (
-            <div style={errorBannerStyle} role="alert" aria-live="polite">
+            <div
+              style={{
+                ...bannerBase,
+                color: "var(--color-error, #c0392b)",
+              }}
+              role="alert"
+              aria-live="polite"
+            >
               {error}
             </div>
           )}
-          <SenderList
-            senders={activeSenders}
-            onMarkRead={handleMarkRead}
-            onUnsubscribe={handleUnsubscribe}
-            onArchive={handleArchive}
-            onDelete={handleDelete}
-            onMarkSpam={handleMarkSpam}
-            onSearch={handleSearch}
-          />
+          {expandedSender ? (
+            <EmailDetail
+              sender={expandedSender}
+              onBack={() => setExpandedSender(null)}
+              onMarkRead={handleMarkRead}
+              onArchive={handleArchive}
+              onDelete={handleDelete}
+              onMarkSpam={handleMarkSpam}
+            />
+          ) : (
+            <SenderList
+              senders={activeSenders}
+              onExpand={setExpandedSender}
+              onMarkRead={handleMarkRead}
+              onUnsubscribe={handleUnsubscribe}
+              onArchive={handleArchive}
+              onDelete={handleDelete}
+              onMarkSpam={handleMarkSpam}
+              onSearch={handleSearch}
+            />
+          )}
         </div>
       </div>
+
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </div>
   );
 }

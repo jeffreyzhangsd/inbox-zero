@@ -43,6 +43,7 @@ export interface Sender {
   listUnsubscribe?: string;
   isUnsubscribed: boolean; // has inbox-zero/unsubscribed label
   emailIds: string[];
+  emails: Email[];
 }
 
 export interface CategoryGroup {

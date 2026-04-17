@@ -1,7 +1,7 @@
 // app/settings/page.tsx
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import ThemeToggle from "@/components/ThemeToggle";
 
@@ -9,6 +9,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 // const CLAUDE_ENABLED = "claude_enabled";
 
 export default function SettingsPage() {
+  const router = useRouter();
   const { data: session } = useSession();
   const email = session?.user?.email;
 
@@ -46,16 +47,21 @@ export default function SettingsPage() {
       <div style={{ maxWidth: 480, margin: "0 auto" }}>
         {/* Back link */}
         <div style={{ marginBottom: 24 }}>
-          <Link
-            href="/inbox"
+          <button
+            type="button"
+            onClick={() => router.back()}
             style={{
+              border: "none",
+              background: "none",
+              padding: 0,
               fontSize: 12,
               color: "var(--text-muted)",
               letterSpacing: "0.02em",
+              cursor: "pointer",
             }}
           >
             ← Back to inbox
-          </Link>
+          </button>
         </div>
 
         {/* Page title */}
