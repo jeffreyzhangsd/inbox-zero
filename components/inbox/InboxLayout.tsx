@@ -432,7 +432,6 @@ export default function InboxLayout() {
               onArchive={handleArchive}
               onDelete={handleDelete}
               onMarkSpam={handleMarkSpam}
-              onSearch={handleSearch}
               onRecategorize={handleRecategorize}
             />
           )}

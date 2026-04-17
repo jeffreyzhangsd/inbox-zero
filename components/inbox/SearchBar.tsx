@@ -14,10 +14,10 @@ export default function SearchBar({
 }: SearchBarProps) {
   const [value, setValue] = useState("");
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") {
-      onSearch(value.trim());
-    }
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const v = e.target.value;
+    setValue(v);
+    onSearch(v);
   }
 
   function handleClear() {
@@ -51,8 +51,7 @@ export default function SearchBar({
       <input
         type="text"
         value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
+        onChange={handleChange}
         placeholder={placeholder}
         aria-label="Search senders"
         style={{

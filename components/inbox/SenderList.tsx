@@ -18,7 +18,6 @@ interface SenderListProps {
   onArchive: (emailIds: string[]) => void;
   onDelete: (emailIds: string[]) => void;
   onMarkSpam: (emailIds: string[]) => void;
-  onSearch: (query: string) => void;
   onRecategorize: (sender: Sender, category: Category) => void;
 }
 
@@ -35,9 +34,9 @@ export default function SenderList({
   onArchive,
   onDelete,
   onMarkSpam,
-  onSearch,
   onRecategorize,
 }: SenderListProps) {
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedDomains, setSelectedDomains] = useState<Set<string>>(
     new Set(),
   );
@@ -48,11 +47,23 @@ export default function SenderList({
   } | null>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
+  const filteredSenders = searchQuery
+    ? senders.filter((s) => {
+        const q = searchQuery.toLowerCase();
+        return (
+          s.displayName.toLowerCase().includes(q) ||
+          s.domain.toLowerCase().includes(q) ||
+          s.fromAddress.toLowerCase().includes(q)
+        );
+      })
+    : senders;
+
   // Derived selection state
   const allSelected =
-    senders.length > 0 && selectedDomains.size === senders.length;
+    filteredSenders.length > 0 &&
+    selectedDomains.size === filteredSenders.length;
   const someSelected =
-    selectedDomains.size > 0 && selectedDomains.size < senders.length;
+    selectedDomains.size > 0 && selectedDomains.size < filteredSenders.length;
 
   // Keep indeterminate state in sync (React doesn't support indeterminate as a prop)
   useEffect(() => {
@@ -80,7 +91,7 @@ export default function SenderList({
 
   function handleSelectAll(e: React.ChangeEvent<HTMLInputElement>) {
     if (e.target.checked) {
-      setSelectedDomains(new Set(senders.map((s) => s.domain)));
+      setSelectedDomains(new Set(filteredSenders.map((s) => s.domain)));
     } else {
       setSelectedDomains(new Set());
     }
@@ -88,7 +99,7 @@ export default function SenderList({
 
   // Collect all emailIds for currently selected senders
   function selectedEmailIds(): string[] {
-    return senders
+    return filteredSenders
       .filter((s) => selectedDomains.has(s.domain))
       .flatMap((s) => s.emailIds);
   }
@@ -147,7 +158,7 @@ export default function SenderList({
         }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <SearchBar onSearch={onSearch} />
+          <SearchBar onSearch={setSearchQuery} />
         </div>
         <button
           type="button"
@@ -184,7 +195,7 @@ export default function SenderList({
           type="checkbox"
           checked={allSelected}
           onChange={handleSelectAll}
-          disabled={senders.length === 0}
+          disabled={filteredSenders.length === 0}
           aria-label="Select all senders"
           style={{ flexShrink: 0, accentColor: "var(--sidebar-active-border)" }}
         />
@@ -195,7 +206,8 @@ export default function SenderList({
             letterSpacing: "0.5px",
           }}
         >
-          {senders.length} sender{senders.length !== 1 ? "s" : ""}
+          {filteredSenders.length} sender
+          {filteredSenders.length !== 1 ? "s" : ""}
         </span>
 
         {selectedDomains.size > 0 && (
@@ -214,7 +226,7 @@ export default function SenderList({
 
       {/* Sender rows */}
       <div style={{ flex: 1, overflowY: "auto" }}>
-        {senders.length === 0 ? (
+        {filteredSenders.length === 0 ? (
           <div
             style={{
               padding: "40px 12px",
@@ -226,7 +238,7 @@ export default function SenderList({
             No senders found.
           </div>
         ) : (
-          senders.map((sender) => (
+          filteredSenders.map((sender) => (
             <SenderRow
               key={sender.domain || sender.fromAddress}
               sender={sender}

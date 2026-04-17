@@ -16,6 +16,32 @@ const GMAIL_LABEL_MAP: Record<string, Category> = {
   CATEGORY_FORUMS: "Updates",
 };
 
+// Known 2-part TLDs where we need 3 parts for the root domain
+const TWO_PART_TLDS = new Set([
+  "co.uk",
+  "co.jp",
+  "co.au",
+  "com.au",
+  "co.nz",
+  "co.za",
+  "co.in",
+  "com.sg",
+  "com.br",
+  "co.kr",
+  "co.id",
+  "co.th",
+]);
+
+function rootDomain(domain: string): string {
+  if (!domain) return domain;
+  const parts = domain.split(".");
+  if (parts.length <= 2) return domain;
+  const tld2 = parts.slice(-2).join(".");
+  return TWO_PART_TLDS.has(tld2)
+    ? parts.slice(-3).join(".")
+    : parts.slice(-2).join(".");
+}
+
 export function parseFromHeader(from: string): {
   fromName: string;
   fromAddress: string;
@@ -42,8 +68,8 @@ function assignCategory(
   email: Email,
   overrides?: Map<string, Category>,
 ): Category {
-  // Domain-level override wins over everything
-  const overrideKey = email.fromDomain || email.fromAddress;
+  // Root-domain override wins over everything
+  const overrideKey = rootDomain(email.fromDomain) || email.fromAddress;
   if (overrides?.has(overrideKey)) return overrides.get(overrideKey)!;
 
   // Domain heuristic first — overrides Gmail labels
@@ -62,59 +88,79 @@ export function categorize(
   emails: Email[],
   overrides?: Map<string, Category>,
 ): GroupedInbox {
-  const categoryMap = new Map<Category, Map<string, Sender>>();
-  for (const cat of ALL_CATEGORIES) {
-    categoryMap.set(cat, new Map());
-  }
+  // Single global pass: group all emails by root domain
+  const domainMap = new Map<
+    string,
+    { sender: Sender; votes: Map<Category, number> }
+  >();
 
   for (const email of emails) {
+    const key = rootDomain(email.fromDomain) || email.fromAddress;
     const category = assignCategory(email, overrides);
-    const senderMap = categoryMap.get(category)!;
-    const key = email.fromDomain || email.fromAddress;
-    const existing = senderMap.get(key);
+    const entry = domainMap.get(key);
 
-    if (existing) {
-      existing.emailCount += 1;
-      if (!email.isRead) existing.unreadCount += 1;
-      if (email.date > existing.mostRecent) {
-        existing.mostRecent = email.date;
-        existing.snippet = email.snippet;
-        existing.fromAddress = email.fromAddress;
+    if (entry) {
+      const { sender, votes } = entry;
+      sender.emailCount += 1;
+      if (!email.isRead) sender.unreadCount += 1;
+      if (email.date > sender.mostRecent) {
+        sender.mostRecent = email.date;
+        sender.snippet = email.snippet;
+        sender.fromAddress = email.fromAddress;
       }
-      // Prefer display names that aren't raw email addresses
-      if (existing.displayName.includes("@") && !email.fromName.includes("@")) {
-        existing.displayName = email.fromName;
+      if (sender.displayName.includes("@") && !email.fromName.includes("@")) {
+        sender.displayName = email.fromName;
       }
-      if (!existing.listUnsubscribe && email.listUnsubscribe) {
-        existing.listUnsubscribe = email.listUnsubscribe;
+      if (!sender.listUnsubscribe && email.listUnsubscribe) {
+        sender.listUnsubscribe = email.listUnsubscribe;
       }
-      existing.emailIds.push(email.id);
-      existing.emails.push(email);
+      sender.emailIds.push(email.id);
+      sender.emails.push(email);
+      votes.set(category, (votes.get(category) ?? 0) + 1);
     } else {
-      senderMap.set(key, {
-        domain: email.fromDomain,
-        displayName: email.fromName,
-        fromAddress: email.fromAddress,
-        emailCount: 1,
-        unreadCount: email.isRead ? 0 : 1,
-        mostRecent: email.date,
-        snippet: email.snippet,
-        listUnsubscribe: email.listUnsubscribe,
-        isUnsubscribed: email.labelIds.includes("inbox-zero/unsubscribed"),
-        emailIds: [email.id],
-        emails: [email],
+      domainMap.set(key, {
+        sender: {
+          domain: rootDomain(email.fromDomain),
+          displayName: email.fromName,
+          fromAddress: email.fromAddress,
+          emailCount: 1,
+          unreadCount: email.isRead ? 0 : 1,
+          mostRecent: email.date,
+          snippet: email.snippet,
+          listUnsubscribe: email.listUnsubscribe,
+          isUnsubscribed: email.labelIds.includes("inbox-zero/unsubscribed"),
+          emailIds: [email.id],
+          emails: [email],
+        },
+        votes: new Map([[category, 1]]),
       });
     }
+  }
+
+  // Assign each sender to its plurality category
+  const categoryBuckets = new Map<Category, Sender[]>();
+  for (const cat of ALL_CATEGORIES) categoryBuckets.set(cat, []);
+
+  for (const { sender, votes } of domainMap.values()) {
+    let winner: Category = "Uncategorized";
+    let max = 0;
+    for (const cat of ALL_CATEGORIES) {
+      const n = votes.get(cat) ?? 0;
+      if (n > max) {
+        max = n;
+        winner = cat;
+      }
+    }
+    categoryBuckets.get(winner)!.push(sender);
   }
 
   let total = 0;
   let totalUnread = 0;
 
   const categories: CategoryGroup[] = ALL_CATEGORIES.map((name) => {
-    const senderMap = categoryMap.get(name)!;
-    const senders = Array.from(senderMap.values()).sort(
-      (a, b) => b.mostRecent - a.mostRecent,
-    );
+    const senders = categoryBuckets
+      .get(name)!
+      .sort((a, b) => b.mostRecent - a.mostRecent);
     const catUnread = senders.reduce((sum, s) => sum + s.unreadCount, 0);
     total += senders.reduce((sum, s) => sum + s.emailCount, 0);
     totalUnread += catUnread;
