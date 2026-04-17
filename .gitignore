@@ -12,6 +12,11 @@
 
 # testing
 /coverage
+*.snap
+
+# claude / superpowers
+.claude/
+.superpowers/
 
 # next.js
 /.next/

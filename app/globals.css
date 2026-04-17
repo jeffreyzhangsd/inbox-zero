@@ -1,26 +1,128 @@
-@import "tailwindcss";
+/* app/globals.css */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #0d0d0d;
+  --bg-container: #141414;
+  --bg-hover: #1a1a1a;
+  --border: #2a2a2a;
+  --divider: #262626;
+  --text-primary: #c8c8c8;
+  --text-secondary: #999;
+  --text-muted: #808080;
+  --sidebar-active-bg: #1e1e1e;
+  --sidebar-active-border: #999;
+  --color-danger: #c44;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+[data-theme="light"] {
+  --bg: #f2f2f0;
+  --bg-container: #ebebea;
+  --bg-hover: #e4e4e2;
+  --border: #d0d0ce;
+  --divider: #dededc;
+  --text-primary: #333;
+  --text-secondary: #666;
+  --text-muted: #595959;
+  --sidebar-active-bg: #e0e0de;
+  --sidebar-active-border: #555;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg: #f2f2f0;
+    --bg-container: #ebebea;
+    --bg-hover: #e4e4e2;
+    --border: #d0d0ce;
+    --divider: #dededc;
+    --text-primary: #333;
+    --text-secondary: #666;
+    --text-muted: #595959;
+    --sidebar-active-bg: #e0e0de;
+    --sidebar-active-border: #555;
   }
 }
 
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text-secondary);
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 13px;
+  line-height: 1.6;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+a:hover {
+  color: var(--text-primary);
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 3px 10px;
+  font-size: 11px;
+  font-family: inherit;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+button:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+input:not([type="checkbox"]):not([type="radio"]) {
+  background: var(--bg-container);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  width: 100%;
+}
+input:focus {
+  outline: 1px solid var(--text-muted);
+  outline-offset: 2px;
+}
+input::placeholder {
+  color: var(--text-muted);
+}
+
+.subtitle {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.error {
+  color: var(--color-danger);
+  font-size: 11px;
+  margin-top: 4px;
+}
+.label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
