@@ -135,15 +135,57 @@ describe("categorize", () => {
     expect(result.totalUnread).toBe(1);
   });
 
-  it("respects category overrides map", () => {
+  it("sender-level override by fromAddress wins over domain heuristic", () => {
     const email = makeEmail({
-      id: "override1",
-      fromDomain: "unknownsite.xyz",
+      id: "1",
+      fromAddress: "noreply@linkedin.com",
+      fromDomain: "linkedin.com",
       labelIds: [],
     });
-    const overrides = new Map([["override1", "Finance" as const]]);
+    // Override moves linkedin sender to Finance
+    const overrides = new Map([["noreply@linkedin.com", "Finance" as const]]);
     const result = categorize([email], overrides);
     const finance = result.categories.find((c) => c.name === "Finance");
+    const jobs = result.categories.find((c) => c.name === "Jobs");
     expect(finance?.senders.length).toBe(1);
+    expect(jobs?.senders.length ?? 0).toBe(0);
+  });
+
+  it("sender-level override applies to all emails from that address", () => {
+    const emails = [
+      makeEmail({
+        id: "1",
+        fromAddress: "news@unknown.com",
+        fromDomain: "unknown.com",
+        labelIds: [],
+      }),
+      makeEmail({
+        id: "2",
+        fromAddress: "news@unknown.com",
+        fromDomain: "unknown.com",
+        labelIds: [],
+      }),
+    ];
+    const overrides = new Map([["news@unknown.com", "Updates" as const]]);
+    const result = categorize(emails, overrides);
+    const updates = result.categories.find((c) => c.name === "Updates");
+    expect(updates?.senders[0]?.emailCount).toBe(2);
+  });
+
+  it("assigns GitHub from domain heuristic (github.com)", () => {
+    const email = makeEmail({ fromDomain: "github.com", labelIds: [] });
+    const result = categorize([email]);
+    const gh = result.categories.find((c) => c.name === "GitHub");
+    expect(gh?.senders.length).toBe(1);
+  });
+
+  it("assigns GitHub from subdomain (notifications.github.com)", () => {
+    const email = makeEmail({
+      fromDomain: "notifications.github.com",
+      labelIds: [],
+    });
+    const result = categorize([email]);
+    const gh = result.categories.find((c) => c.name === "GitHub");
+    expect(gh?.senders.length).toBe(1);
   });
 });

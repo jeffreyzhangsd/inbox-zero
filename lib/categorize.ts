@@ -42,7 +42,9 @@ function assignCategory(
   email: Email,
   overrides?: Map<string, Category>,
 ): Category {
-  if (overrides?.has(email.id)) return overrides.get(email.id)!;
+  // Sender-level override by fromAddress wins over everything
+  if (overrides?.has(email.fromAddress))
+    return overrides.get(email.fromAddress)!;
 
   // Domain heuristic first — overrides Gmail labels
   const domainCat = getDomainCategory(email.fromDomain);
