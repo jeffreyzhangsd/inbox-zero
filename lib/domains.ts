@@ -41,6 +41,10 @@ export const DOMAIN_CATEGORY_MAP: Record<string, Category> = {
   "vanguard.com": "Finance",
   "turbotax.com": "Finance",
   "intuit.com": "Finance",
+
+  // GitHub
+  "github.com": "GitHub",
+  "githubapp.com": "GitHub",
 };
 
 export function getDomainCategory(domain: string): Category | null {

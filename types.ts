@@ -6,6 +6,7 @@ export type Category =
   | "Promotions"
   | "Social"
   | "Updates"
+  | "GitHub"
   | "Uncategorized";
 
 export const ALL_CATEGORIES: Category[] = [
@@ -14,6 +15,7 @@ export const ALL_CATEGORIES: Category[] = [
   "Promotions",
   "Social",
   "Updates",
+  "GitHub",
   "Uncategorized",
 ];
 
