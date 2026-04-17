@@ -210,16 +210,18 @@ export default function SenderRow({
           <ActionButton label="Unsub" onClick={() => setConfirm("unsub")} />
         )}
 
-        <ActionButton
-          label="move to ▸"
-          buttonRef={moveToButtonRef}
-          onClick={() => {
-            const rect = moveToButtonRef.current?.getBoundingClientRect();
-            if (rect) {
-              setPickerPos({ x: rect.left, y: rect.bottom + 4 });
-            }
-          }}
-        />
+        {currentCategory !== "Unsubscribed" && (
+          <ActionButton
+            label="move to ▸"
+            buttonRef={moveToButtonRef}
+            onClick={() => {
+              const rect = moveToButtonRef.current?.getBoundingClientRect();
+              if (rect) {
+                setPickerPos({ x: rect.left, y: rect.bottom + 4 });
+              }
+            }}
+          />
+        )}
 
         <div ref={menuRef} style={{ position: "relative" }}>
           <button

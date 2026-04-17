@@ -110,6 +110,22 @@ export default function InboxLayout() {
     }
   }, [senderOverrides]);
 
+  // Keep expandedSender in sync when data refreshes after actions
+  useEffect(() => {
+    if (!expandedSender) return;
+    for (const cat of data.categories) {
+      const updated = cat.senders.find(
+        (s) => s.fromAddress === expandedSender.fromAddress,
+      );
+      if (updated) {
+        setExpandedSender(updated);
+        return;
+      }
+    }
+    // All emails from this sender were removed
+    setExpandedSender(null);
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleRecategorize = useCallback(
     (sender: Sender, category: Category) => {
       setSenderOverrides((prev) => {
@@ -271,6 +287,10 @@ export default function InboxLayout() {
     (emailIds: string[]) => callAction("markRead", emailIds),
     [callAction],
   );
+  const handleMarkUnread = useCallback(
+    (emailIds: string[]) => callAction("markUnread", emailIds),
+    [callAction],
+  );
   const handleArchive = useCallback(
     (emailIds: string[]) => callAction("archive", emailIds),
     [callAction],
@@ -416,6 +436,7 @@ export default function InboxLayout() {
               sender={expandedSender}
               onBack={() => setExpandedSender(null)}
               onMarkRead={handleMarkRead}
+              onMarkUnread={handleMarkUnread}
               onArchive={handleArchive}
               onDelete={handleDelete}
               onMarkSpam={handleMarkSpam}

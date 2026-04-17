@@ -110,6 +110,47 @@ export async function batchDelete(
   });
 }
 
+type GmailPart = {
+  mimeType?: string | null;
+  body?: { data?: string | null } | null;
+  parts?: GmailPart[] | null;
+};
+
+function extractBodyParts(part: GmailPart): { html?: string; plain?: string } {
+  const mime = part.mimeType ?? "";
+  if (mime === "text/html" && part.body?.data) {
+    return { html: Buffer.from(part.body.data, "base64").toString("utf-8") };
+  }
+  if (mime === "text/plain" && part.body?.data) {
+    return { plain: Buffer.from(part.body.data, "base64").toString("utf-8") };
+  }
+  if (part.parts) {
+    const result: { html?: string; plain?: string } = {};
+    for (const p of part.parts) {
+      const sub = extractBodyParts(p);
+      if (sub.html) result.html = sub.html;
+      if (sub.plain && !result.plain) result.plain = sub.plain;
+    }
+    return result;
+  }
+  return {};
+}
+
+export async function fetchEmailBody(
+  accessToken: string,
+  id: string,
+): Promise<{ id: string; html?: string; plain?: string }> {
+  const gmail = getGmailClient(accessToken);
+  const res = await gmail.users.messages.get({
+    userId: "me",
+    id,
+    format: "full",
+  });
+  const msg = res.data;
+  const body = msg.payload ? extractBodyParts(msg.payload as GmailPart) : {};
+  return { id: msg.id!, ...body };
+}
+
 export async function sendEmail(
   accessToken: string,
   to: string,
