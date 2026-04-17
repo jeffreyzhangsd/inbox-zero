@@ -2,13 +2,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Sender } from "@/types";
+import type { Sender, Category, SortBy } from "@/types";
 import SenderRow from "./SenderRow";
 import SearchBar from "./SearchBar";
 import BulkActionBar from "./BulkActionBar";
 
 interface SenderListProps {
   senders: Sender[];
+  sortBy: SortBy;
+  onSortChange: (sort: SortBy) => void;
+  senderCategoryMap: Map<string, Category>;
   onExpand: (sender: Sender) => void;
   onMarkRead: (emailIds: string[]) => void;
   onUnsubscribe: (sender: Sender) => void;
@@ -16,10 +19,16 @@ interface SenderListProps {
   onDelete: (emailIds: string[]) => void;
   onMarkSpam: (emailIds: string[]) => void;
   onSearch: (query: string) => void;
+  onRecategorize: (sender: Sender, category: Category) => void;
 }
+
+const SORT_CYCLE: SortBy[] = ["recent", "oldest", "volume"];
 
 export default function SenderList({
   senders,
+  sortBy,
+  onSortChange,
+  senderCategoryMap,
   onExpand,
   onMarkRead,
   onUnsubscribe,
@@ -27,6 +36,7 @@ export default function SenderList({
   onDelete,
   onMarkSpam,
   onSearch,
+  onRecategorize,
 }: SenderListProps) {
   const [selectedDomains, setSelectedDomains] = useState<Set<string>>(
     new Set(),
@@ -112,6 +122,11 @@ export default function SenderList({
     setSelectedDomains(new Set());
   }
 
+  function handleSortCycle() {
+    const idx = SORT_CYCLE.indexOf(sortBy);
+    onSortChange(SORT_CYCLE[(idx + 1) % SORT_CYCLE.length]);
+  }
+
   return (
     <div
       style={{
@@ -121,14 +136,36 @@ export default function SenderList({
         overflow: "hidden",
       }}
     >
-      {/* Search */}
+      {/* Search + Sort row */}
       <div
         style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
           padding: "10px 12px",
           borderBottom: "1px solid var(--border)",
         }}
       >
-        <SearchBar onSearch={onSearch} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <SearchBar onSearch={onSearch} />
+        </div>
+        <button
+          type="button"
+          onClick={handleSortCycle}
+          title={`Sort: ${sortBy}`}
+          style={{
+            border: "1px solid var(--border)",
+            background: "none",
+            color: "var(--text-muted)",
+            padding: "3px 8px",
+            fontSize: "11px",
+            cursor: "pointer",
+            flexShrink: 0,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {sortBy}
+        </button>
       </div>
 
       {/* Toolbar */}
@@ -191,9 +228,12 @@ export default function SenderList({
         ) : (
           senders.map((sender) => (
             <SenderRow
-              key={sender.fromAddress}
+              key={sender.domain || sender.fromAddress}
               sender={sender}
               selected={selectedDomains.has(sender.domain)}
+              currentCategory={senderCategoryMap.get(
+                sender.domain || sender.fromAddress,
+              )}
               onSelect={handleSelect}
               onExpand={onExpand}
               onMarkRead={onMarkRead}
@@ -201,6 +241,7 @@ export default function SenderList({
               onArchive={onArchive}
               onDelete={onDelete}
               onMarkSpam={onMarkSpam}
+              onRecategorize={onRecategorize}
             />
           ))
         )}

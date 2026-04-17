@@ -141,13 +141,18 @@ export async function createSpamFilter(
   fromAddress: string,
 ): Promise<void> {
   const gmail = getGmailClient(accessToken);
-  await gmail.users.settings.filters.create({
-    userId: "me",
-    requestBody: {
-      criteria: { from: fromAddress },
-      action: { addLabelIds: ["SPAM"], removeLabelIds: ["INBOX"] },
-    },
-  });
+  try {
+    await gmail.users.settings.filters.create({
+      userId: "me",
+      requestBody: {
+        criteria: { from: fromAddress },
+        action: { removeLabelIds: ["INBOX"] },
+      },
+    });
+  } catch (e: unknown) {
+    // Filter already exists — idempotent, ignore
+    if ((e as { code?: number }).code !== 400) throw e;
+  }
 }
 
 export async function searchEmails(

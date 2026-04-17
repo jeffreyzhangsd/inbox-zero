@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Sender } from "@/types";
+import type { Sender, Category } from "@/types";
+import { ALL_CATEGORIES } from "@/types";
 import { decodeEntities, timeAgo } from "@/lib/format";
 
 interface SenderRowProps {
   sender: Sender;
   selected: boolean;
+  currentCategory?: Category;
   onSelect: (domain: string, checked: boolean) => void;
   onExpand: (sender: Sender) => void;
   onMarkRead: (emailIds: string[]) => void;
@@ -14,11 +16,13 @@ interface SenderRowProps {
   onArchive: (emailIds: string[]) => void;
   onDelete: (emailIds: string[]) => void;
   onMarkSpam: (emailIds: string[]) => void;
+  onRecategorize: (sender: Sender, category: Category) => void;
 }
 
 export default function SenderRow({
   sender,
   selected,
+  currentCategory,
   onSelect,
   onExpand,
   onMarkRead,
@@ -26,10 +30,15 @@ export default function SenderRow({
   onArchive,
   onDelete,
   onMarkSpam,
+  onRecategorize,
 }: SenderRowProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirm, setConfirm] = useState<"delete" | "unsub" | null>(null);
+  const [pickerPos, setPickerPos] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const menuRef = useRef<HTMLDivElement>(null);
+  const moveToButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -42,8 +51,22 @@ export default function SenderRow({
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (!pickerPos) return;
+    function handleClick(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      if (target.closest("[data-category-picker]")) return;
+      setPickerPos(null);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [pickerPos]);
+
   const hasUnread = sender.unreadCount > 0;
-  const canUnsub = Boolean(sender.listUnsubscribe) && !sender.isUnsubscribed;
+  const canUnsub =
+    Boolean(sender.listUnsubscribe) &&
+    !sender.isUnsubscribed &&
+    currentCategory !== "Unsubscribed";
 
   return (
     <div
@@ -72,6 +95,10 @@ export default function SenderRow({
         if (!selected) {
           e.currentTarget.style.background = "transparent";
         }
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setPickerPos({ x: e.clientX, y: e.clientY });
       }}
     >
       <input
@@ -183,6 +210,17 @@ export default function SenderRow({
           <ActionButton label="Unsub" onClick={() => setConfirm("unsub")} />
         )}
 
+        <ActionButton
+          label="move to ▸"
+          buttonRef={moveToButtonRef}
+          onClick={() => {
+            const rect = moveToButtonRef.current?.getBoundingClientRect();
+            if (rect) {
+              setPickerPos({ x: rect.left, y: rect.bottom + 4 });
+            }
+          }}
+        />
+
         <div ref={menuRef} style={{ position: "relative" }}>
           <button
             type="button"
@@ -288,6 +326,17 @@ export default function SenderRow({
           </div>
         </div>
       )}
+
+      {pickerPos && (
+        <CategoryPicker
+          pos={pickerPos}
+          currentCategory={currentCategory}
+          onSelect={(category) => {
+            onRecategorize(sender, category);
+            setPickerPos(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -295,11 +344,13 @@ export default function SenderRow({
 interface ActionButtonProps {
   label: string;
   onClick: () => void;
+  buttonRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
-function ActionButton({ label, onClick }: ActionButtonProps) {
+function ActionButton({ label, onClick, buttonRef }: ActionButtonProps) {
   return (
     <button
+      ref={buttonRef}
       type="button"
       onClick={onClick}
       style={{
@@ -360,5 +411,73 @@ function DropdownItem({ label, onClick, danger = false }: DropdownItemProps) {
     >
       {label}
     </button>
+  );
+}
+
+interface CategoryPickerProps {
+  pos: { x: number; y: number };
+  currentCategory?: Category;
+  onSelect: (category: Category) => void;
+}
+
+function CategoryPicker({
+  pos,
+  currentCategory,
+  onSelect,
+}: CategoryPickerProps) {
+  const options = ALL_CATEGORIES.filter((c) => c !== currentCategory);
+  const pickerHeight = options.length * 27 + 8;
+  const pickerWidth = 130;
+  const left = Math.min(pos.x, window.innerWidth - pickerWidth - 8);
+  const top = Math.min(pos.y, window.innerHeight - pickerHeight - 8);
+
+  return (
+    <div
+      data-category-picker=""
+      style={{
+        position: "fixed",
+        left,
+        top,
+        background: "var(--bg-container)",
+        border: "1px solid var(--border)",
+        zIndex: 200,
+        minWidth: "130px",
+        padding: "4px 0",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+      }}
+      role="menu"
+      aria-label="Move to category"
+    >
+      {options.map((cat) => (
+        <button
+          key={cat}
+          type="button"
+          role="menuitem"
+          onClick={() => onSelect(cat)}
+          style={{
+            display: "block",
+            width: "100%",
+            textAlign: "left",
+            border: "none",
+            background: "none",
+            color: "var(--text-secondary)",
+            padding: "5px 12px",
+            fontSize: "12px",
+            cursor: "pointer",
+            transition: "background 0.1s, color 0.1s",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "var(--bg-hover)";
+            e.currentTarget.style.color = "var(--text-primary)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "none";
+            e.currentTarget.style.color = "var(--text-secondary)";
+          }}
+        >
+          {cat}
+        </button>
+      ))}
+    </div>
   );
 }

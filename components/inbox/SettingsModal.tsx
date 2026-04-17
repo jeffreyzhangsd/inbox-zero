@@ -3,7 +3,6 @@
 
 import { useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
-import ThemeToggle from "@/components/ThemeToggle";
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -125,37 +124,6 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
             >
               Sign out
             </button>
-          </div>
-        </section>
-
-        {/* Appearance */}
-        <section>
-          <div
-            className="label"
-            style={{
-              marginBottom: 10,
-              fontSize: 11,
-              color: "var(--text-muted)",
-              letterSpacing: "0.05em",
-            }}
-          >
-            APPEARANCE
-          </div>
-          <div
-            style={{
-              background: "var(--bg-container)",
-              border: "1px solid var(--border)",
-              padding: "12px 14px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-            }}
-          >
-            <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-              Theme
-            </span>
-            <ThemeToggle />
           </div>
         </section>
       </div>

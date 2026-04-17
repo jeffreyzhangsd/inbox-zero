@@ -7,7 +7,8 @@ export type Category =
   | "Social"
   | "Updates"
   | "GitHub"
-  | "Uncategorized";
+  | "Uncategorized"
+  | "Unsubscribed";
 
 export const ALL_CATEGORIES: Category[] = [
   "Jobs",
@@ -17,6 +18,7 @@ export const ALL_CATEGORIES: Category[] = [
   "Updates",
   "GitHub",
   "Uncategorized",
+  "Unsubscribed",
 ];
 
 export type SortBy = "recent" | "oldest" | "volume";

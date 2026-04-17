@@ -42,9 +42,9 @@ function assignCategory(
   email: Email,
   overrides?: Map<string, Category>,
 ): Category {
-  // Sender-level override by fromAddress wins over everything
-  if (overrides?.has(email.fromAddress))
-    return overrides.get(email.fromAddress)!;
+  // Domain-level override wins over everything
+  const overrideKey = email.fromDomain || email.fromAddress;
+  if (overrides?.has(overrideKey)) return overrides.get(overrideKey)!;
 
   // Domain heuristic first — overrides Gmail labels
   const domainCat = getDomainCategory(email.fromDomain);
@@ -70,7 +70,8 @@ export function categorize(
   for (const email of emails) {
     const category = assignCategory(email, overrides);
     const senderMap = categoryMap.get(category)!;
-    const existing = senderMap.get(email.fromAddress);
+    const key = email.fromDomain || email.fromAddress;
+    const existing = senderMap.get(key);
 
     if (existing) {
       existing.emailCount += 1;
@@ -78,11 +79,19 @@ export function categorize(
       if (email.date > existing.mostRecent) {
         existing.mostRecent = email.date;
         existing.snippet = email.snippet;
+        existing.fromAddress = email.fromAddress;
+      }
+      // Prefer display names that aren't raw email addresses
+      if (existing.displayName.includes("@") && !email.fromName.includes("@")) {
+        existing.displayName = email.fromName;
+      }
+      if (!existing.listUnsubscribe && email.listUnsubscribe) {
+        existing.listUnsubscribe = email.listUnsubscribe;
       }
       existing.emailIds.push(email.id);
       existing.emails.push(email);
     } else {
-      senderMap.set(email.fromAddress, {
+      senderMap.set(key, {
         domain: email.fromDomain,
         displayName: email.fromName,
         fromAddress: email.fromAddress,

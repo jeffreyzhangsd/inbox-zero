@@ -114,7 +114,7 @@ export default function InboxLayout() {
     (sender: Sender, category: Category) => {
       setSenderOverrides((prev) => {
         const next = new Map(prev);
-        next.set(sender.fromAddress, category);
+        next.set(sender.domain || sender.fromAddress, category);
         try {
           localStorage.setItem(
             "inbox-zero:sender-overrides",
@@ -131,7 +131,7 @@ export default function InboxLayout() {
     const map = new Map<string, Category>();
     for (const cat of data.categories) {
       for (const s of cat.senders) {
-        map.set(s.fromAddress, cat.name);
+        map.set(s.domain || s.fromAddress, cat.name);
       }
     }
     return map;
@@ -144,8 +144,9 @@ export default function InboxLayout() {
       senders = data.categories
         .flatMap((c) => c.senders)
         .filter((s) => {
-          if (seen.has(s.fromAddress)) return false;
-          seen.add(s.fromAddress);
+          const domainKey = s.domain || s.fromAddress;
+          if (seen.has(domainKey)) return false;
+          seen.add(domainKey);
           return true;
         });
     } else {
@@ -159,7 +160,8 @@ export default function InboxLayout() {
     if (sortBy === "volume") {
       return [...senders].sort((a, b) => b.emailCount - a.emailCount);
     }
-    return senders;
+    // "recent": flatMap interleaves per-category sorted lists, so re-sort globally
+    return [...senders].sort((a, b) => b.mostRecent - a.mostRecent);
   }, [data, activeCategory, sortBy]);
 
   const loadData = useCallback(async () => {
@@ -182,6 +184,10 @@ export default function InboxLayout() {
 
   const applyMarkRead = useCallback((emailIds: string[]) => {
     const idSet = new Set(emailIds);
+    // Keep ref in sync so SSE re-categorize doesn't undo the optimistic update
+    allEmailsRef.current = allEmailsRef.current.map((e) =>
+      idSet.has(e.id) ? { ...e, isRead: true } : e,
+    );
     setData((prev) => {
       const categories = prev.categories.map((cat) => {
         const senders = cat.senders.map((s) => {
@@ -288,6 +294,7 @@ export default function InboxLayout() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             emailIds: sender.emailIds,
+            fromAddress: sender.fromAddress,
             listUnsubscribe: sender.listUnsubscribe,
           }),
         });
@@ -295,7 +302,7 @@ export default function InboxLayout() {
           setError(`Unsubscribe failed (${res.status})`);
           return;
         }
-        await loadData();
+        handleRecategorize(sender, "Unsubscribed");
       } catch {
         setError("Network error: unsubscribe failed.");
       } finally {

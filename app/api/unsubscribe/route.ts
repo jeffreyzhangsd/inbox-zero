@@ -1,7 +1,7 @@
 // app/api/unsubscribe/route.ts
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { batchModify, sendEmail, createSpamFilter } from "@/lib/gmail";
+import { sendEmail, createSpamFilter } from "@/lib/gmail";
 import { parseListUnsubscribe } from "@/lib/unsubscribe";
 
 export async function POST(request: Request) {
@@ -37,8 +37,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // Archive emails and create a spam filter for future emails from this sender
-  await batchModify(session.accessToken, emailIds, [], ["INBOX"]);
+  // Create a filter so future emails from this sender skip the inbox
   await createSpamFilter(session.accessToken, fromAddress);
 
   return NextResponse.json({ ok: true });
