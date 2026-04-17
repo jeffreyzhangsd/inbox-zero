@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
-import type { GroupedInbox, Category, Sender, Email } from "@/types";
+import type { GroupedInbox, Category, Sender, Email, SortBy } from "@/types";
 import { categorize } from "@/lib/categorize";
 import Sidebar from "./Sidebar";
 import SenderList from "./SenderList";
@@ -48,11 +48,28 @@ export default function InboxLayout() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [senderOverrides, setSenderOverrides] = useState<Map<string, Category>>(
+    () => {
+      try {
+        const raw = localStorage.getItem("inbox-zero:sender-overrides");
+        if (raw) return new Map(JSON.parse(raw) as [string, Category][]);
+      } catch {}
+      return new Map();
+    },
+  );
+  const [sortBy, setSortBy] = useState<SortBy>("recent");
+
   // streaming state
   const allEmailsRef = useRef<Email[]>([]);
   const streamDoneRef = useRef(false);
   const [streamLoaded, setStreamLoaded] = useState(0);
   const [streamDone, setStreamDone] = useState(false);
+
+  const senderOverridesRef = useRef<Map<string, Category>>(new Map());
+
+  useEffect(() => {
+    senderOverridesRef.current = senderOverrides;
+  }, [senderOverrides]);
 
   const { data: session } = useSession();
 
@@ -67,7 +84,7 @@ export default function InboxLayout() {
         const emails = msg.emails as Email[];
         allEmailsRef.current.push(...emails);
         setStreamLoaded(allEmailsRef.current.length);
-        setData(categorize(allEmailsRef.current));
+        setData(categorize(allEmailsRef.current, senderOverridesRef.current));
       } else if (msg.type === "done") {
         streamDoneRef.current = true;
         setStreamDone(true);
@@ -87,21 +104,63 @@ export default function InboxLayout() {
     return () => es.close();
   }, []);
 
+  useEffect(() => {
+    if (allEmailsRef.current.length > 0) {
+      setData(categorize(allEmailsRef.current, senderOverrides));
+    }
+  }, [senderOverrides]);
+
+  const handleRecategorize = useCallback(
+    (sender: Sender, category: Category) => {
+      setSenderOverrides((prev) => {
+        const next = new Map(prev);
+        next.set(sender.fromAddress, category);
+        try {
+          localStorage.setItem(
+            "inbox-zero:sender-overrides",
+            JSON.stringify(Array.from(next.entries())),
+          );
+        } catch {}
+        return next;
+      });
+    },
+    [],
+  );
+
+  const senderCategoryMap = useMemo(() => {
+    const map = new Map<string, Category>();
+    for (const cat of data.categories) {
+      for (const s of cat.senders) {
+        map.set(s.fromAddress, cat.name);
+      }
+    }
+    return map;
+  }, [data]);
+
   const activeSenders: Sender[] = useMemo(() => {
+    let senders: Sender[];
     if (activeCategory === "all") {
       const seen = new Set<string>();
-      return data.categories
+      senders = data.categories
         .flatMap((c) => c.senders)
         .filter((s) => {
           if (seen.has(s.fromAddress)) return false;
           seen.add(s.fromAddress);
           return true;
         });
+    } else {
+      senders =
+        data.categories.find((c) => c.name === activeCategory)?.senders ?? [];
     }
-    return (
-      data.categories.find((c) => c.name === activeCategory)?.senders ?? []
-    );
-  }, [data, activeCategory]);
+
+    if (sortBy === "oldest") {
+      return [...senders].sort((a, b) => a.mostRecent - b.mostRecent);
+    }
+    if (sortBy === "volume") {
+      return [...senders].sort((a, b) => b.emailCount - a.emailCount);
+    }
+    return senders;
+  }, [data, activeCategory, sortBy]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -357,6 +416,9 @@ export default function InboxLayout() {
           ) : (
             <SenderList
               senders={activeSenders}
+              sortBy={sortBy}
+              onSortChange={setSortBy}
+              senderCategoryMap={senderCategoryMap}
               onExpand={setExpandedSender}
               onMarkRead={handleMarkRead}
               onUnsubscribe={handleUnsubscribe}
@@ -364,6 +426,7 @@ export default function InboxLayout() {
               onDelete={handleDelete}
               onMarkSpam={handleMarkSpam}
               onSearch={handleSearch}
+              onRecategorize={handleRecategorize}
             />
           )}
         </div>

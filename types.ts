@@ -19,6 +19,8 @@ export const ALL_CATEGORIES: Category[] = [
   "Uncategorized",
 ];
 
+export type SortBy = "recent" | "oldest" | "volume";
+
 export interface Email {
   id: string;
   threadId: string;
