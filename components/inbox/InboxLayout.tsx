@@ -225,6 +225,32 @@ export default function InboxLayout() {
     });
   }, []);
 
+  const applyMarkUnread = useCallback((emailIds: string[]) => {
+    const idSet = new Set(emailIds);
+    allEmailsRef.current = allEmailsRef.current.map((e) =>
+      idSet.has(e.id) ? { ...e, isRead: false } : e,
+    );
+    setData((prev) => {
+      const categories = prev.categories.map((cat) => {
+        const senders = cat.senders.map((s) => {
+          const affected = s.emailIds.filter((id) => idSet.has(id)).length;
+          if (affected === 0) return s;
+          return { ...s, unreadCount: s.unreadCount + affected };
+        });
+        return {
+          ...cat,
+          senders,
+          totalUnread: senders.reduce((n, s) => n + s.unreadCount, 0),
+        };
+      });
+      return {
+        ...prev,
+        categories,
+        totalUnread: categories.reduce((n, c) => n + c.totalUnread, 0),
+      };
+    });
+  }, []);
+
   const callAction = useCallback(
     async (action: string, emailIds: string[]) => {
       if (action === "markRead") {
@@ -234,6 +260,15 @@ export default function InboxLayout() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action, emailIds }),
         }).catch(() => setError("Mark read failed — reload to sync."));
+        return;
+      }
+      if (action === "markUnread") {
+        applyMarkUnread(emailIds);
+        fetch("/api/actions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action, emailIds }),
+        }).catch(() => setError("Mark unread failed — reload to sync."));
         return;
       }
       setLoading(true);
@@ -255,7 +290,7 @@ export default function InboxLayout() {
         setLoading(false);
       }
     },
-    [loadData, applyMarkRead],
+    [loadData, applyMarkRead, applyMarkUnread],
   );
 
   const handleSearch = useCallback(
@@ -406,7 +441,10 @@ export default function InboxLayout() {
           activeCategory={activeCategory}
           total={data.total}
           totalUnread={data.totalUnread}
-          onSelect={setActiveCategory}
+          onSelect={(cat) => {
+            setActiveCategory(cat);
+            setExpandedSender(null);
+          }}
         />
 
         <div style={innerContainerStyle}>

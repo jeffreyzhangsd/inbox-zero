@@ -28,13 +28,21 @@ export default function EmailDetail({
   onDelete,
   onMarkSpam,
 }: EmailDetailProps) {
-  const sorted = [...sender.emails].sort((a, b) => b.date - a.date);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [openEmail, setOpenEmail] = useState<Email | null>(null);
   const [emailBody, setEmailBody] = useState<BodyData | null>(null);
   const [loadingBody, setLoadingBody] = useState(false);
-  // locally-tracked reads: email opened in viewer → treat as read
+  // locally-tracked read state: opened = read, explicitly unread = unread
   const [localReadIds, setLocalReadIds] = useState<Set<string>>(new Set());
+  const [localUnreadIds, setLocalUnreadIds] = useState<Set<string>>(new Set());
+  // locally-tracked deleted/archived: hide immediately without waiting for reload
+  const [localDeletedIds, setLocalDeletedIds] = useState<Set<string>>(
+    new Set(),
+  );
+
+  const sorted = [...sender.emails]
+    .filter((e) => !localDeletedIds.has(e.id))
+    .sort((a, b) => b.date - a.date);
 
   const openFullEmail = useCallback(
     async (email: Email) => {
@@ -75,7 +83,10 @@ export default function EmailDetail({
         email={openEmail}
         body={emailBody}
         loading={loadingBody}
-        isRead={openEmail.isRead || localReadIds.has(openEmail.id)}
+        isRead={
+          (openEmail.isRead || localReadIds.has(openEmail.id)) &&
+          !localUnreadIds.has(openEmail.id)
+        }
         onBack={() => {
           setOpenEmail(null);
           setEmailBody(null);
@@ -87,16 +98,19 @@ export default function EmailDetail({
             ids.forEach((id) => n.delete(id));
             return n;
           });
+          setLocalUnreadIds((prev) => new Set([...prev, ...ids]));
           setOpenEmail(null);
           setEmailBody(null);
         }}
         onArchive={(ids) => {
           onArchive(ids);
+          setLocalDeletedIds((prev) => new Set([...prev, ...ids]));
           setOpenEmail(null);
           setEmailBody(null);
         }}
         onDelete={(ids) => {
           onDelete(ids);
+          setLocalDeletedIds((prev) => new Set([...prev, ...ids]));
           setOpenEmail(null);
           setEmailBody(null);
         }}
@@ -211,6 +225,9 @@ export default function EmailDetail({
             label="Archive"
             onClick={() => {
               onArchive(selectedArray);
+              setLocalDeletedIds(
+                (prev) => new Set([...prev, ...selectedArray]),
+              );
               clearSelection();
             }}
           />
@@ -218,6 +235,9 @@ export default function EmailDetail({
             label="Delete"
             onClick={() => {
               onDelete(selectedArray);
+              setLocalDeletedIds(
+                (prev) => new Set([...prev, ...selectedArray]),
+              );
               clearSelection();
             }}
             danger
@@ -245,7 +265,10 @@ export default function EmailDetail({
           <EmailRow
             key={email.id}
             email={email}
-            isRead={email.isRead || localReadIds.has(email.id)}
+            isRead={
+              (email.isRead || localReadIds.has(email.id)) &&
+              !localUnreadIds.has(email.id)
+            }
             selected={selectedIds.has(email.id)}
             onSelect={(checked) => toggleSelect(email.id, checked)}
             onOpen={() => openFullEmail(email)}
@@ -253,8 +276,14 @@ export default function EmailDetail({
               onMarkRead([email.id]);
               setLocalReadIds((prev) => new Set([...prev, email.id]));
             }}
-            onArchive={() => onArchive([email.id])}
-            onDelete={() => onDelete([email.id])}
+            onArchive={() => {
+              onArchive([email.id]);
+              setLocalDeletedIds((prev) => new Set([...prev, email.id]));
+            }}
+            onDelete={() => {
+              onDelete([email.id]);
+              setLocalDeletedIds((prev) => new Set([...prev, email.id]));
+            }}
           />
         ))}
       </div>
