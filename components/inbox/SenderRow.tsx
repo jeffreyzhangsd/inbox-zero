@@ -149,6 +149,24 @@ export default function SenderRow({
             {sender.emailCount} email{sender.emailCount !== 1 ? "s" : ""}
           </span>
 
+          {currentCategory && (
+            <span
+              style={{
+                fontSize: "10px",
+                color: "var(--text-muted)",
+                background: "var(--bg-container)",
+                border: "1px solid var(--border)",
+                borderRadius: "3px",
+                padding: "0 5px",
+                lineHeight: "16px",
+                flexShrink: 0,
+                opacity: 0.75,
+              }}
+            >
+              {currentCategory}
+            </span>
+          )}
+
           {hasUnread && (
             <span
               style={{

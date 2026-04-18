@@ -22,6 +22,18 @@ export default function AccountSwitcher({
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+      <span
+        style={{
+          fontSize: "11px",
+          color: "var(--text-muted)",
+          maxWidth: "160px",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {activeAccount}
+      </span>
       {accounts.map((email, i) => {
         const isActive = email === activeAccount;
         const initial = email[0]?.toUpperCase() ?? "?";

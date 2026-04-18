@@ -172,6 +172,7 @@ export default function InboxLayout() {
     if (activeCategory === "all") {
       const seen = new Set<string>();
       senders = data.categories
+        .filter((c) => c.name !== "Unsubscribed")
         .flatMap((c) => c.senders)
         .filter((s) => {
           const domainKey = s.domain || s.fromAddress;
@@ -421,7 +422,7 @@ export default function InboxLayout() {
                 opacity: 0.7,
               }}
             >
-              {`loading… ${streamLoaded} emails`}
+              {`loading… ${streamLoaded}`}
             </span>
           )}
         </div>

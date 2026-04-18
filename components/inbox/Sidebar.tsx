@@ -69,7 +69,7 @@ export default function Sidebar({
           isActive={activeCategory === "all"}
           isEmpty={false}
           onClick={() => onSelect("all")}
-          sublabel={`${total} sender${total !== 1 ? "s" : ""}`}
+          sublabel={`${total} email${total !== 1 ? "s" : ""}`}
         />
       </div>
     </aside>

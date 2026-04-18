@@ -37,6 +37,7 @@ export default function SenderList({
   onRecategorize,
 }: SenderListProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [unreadOnly, setUnreadOnly] = useState(false);
   const [selectedDomains, setSelectedDomains] = useState<Set<string>>(
     new Set(),
   );
@@ -47,16 +48,16 @@ export default function SenderList({
   } | null>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
-  const filteredSenders = searchQuery
-    ? senders.filter((s) => {
-        const q = searchQuery.toLowerCase();
-        return (
-          s.displayName.toLowerCase().includes(q) ||
-          s.domain.toLowerCase().includes(q) ||
-          s.fromAddress.toLowerCase().includes(q)
-        );
-      })
-    : senders;
+  const filteredSenders = senders.filter((s) => {
+    if (unreadOnly && s.unreadCount === 0) return false;
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      s.displayName.toLowerCase().includes(q) ||
+      s.domain.toLowerCase().includes(q) ||
+      s.fromAddress.toLowerCase().includes(q)
+    );
+  });
 
   // Derived selection state
   const allSelected =
@@ -160,23 +161,78 @@ export default function SenderList({
         <div style={{ flex: 1, minWidth: 0 }}>
           <SearchBar onSearch={setSearchQuery} />
         </div>
-        <button
-          type="button"
-          onClick={handleSortCycle}
-          title={`Sort: ${sortBy}`}
+        <div
           style={{
-            border: "1px solid var(--border)",
-            background: "none",
-            color: "var(--text-muted)",
-            padding: "3px 8px",
-            fontSize: "11px",
-            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
             flexShrink: 0,
-            whiteSpace: "nowrap",
           }}
         >
-          {sortBy}
-        </button>
+          <span
+            style={{
+              fontSize: "10px",
+              color: "var(--text-muted)",
+              opacity: 0.6,
+            }}
+          >
+            filter:
+          </span>
+          <button
+            type="button"
+            onClick={() => setUnreadOnly((v) => !v)}
+            title="Show unread only"
+            style={{
+              border: "1px solid var(--border)",
+              background: unreadOnly ? "var(--sidebar-active-bg)" : "none",
+              color: unreadOnly
+                ? "var(--sidebar-active-border)"
+                : "var(--text-muted)",
+              borderColor: unreadOnly
+                ? "var(--sidebar-active-border)"
+                : "var(--border)",
+              padding: "3px 8px",
+              fontSize: "11px",
+              cursor: "pointer",
+            }}
+          >
+            unread
+          </button>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            flexShrink: 0,
+          }}
+        >
+          <span
+            style={{
+              fontSize: "10px",
+              color: "var(--text-muted)",
+              opacity: 0.6,
+            }}
+          >
+            sort:
+          </span>
+          <button
+            type="button"
+            onClick={handleSortCycle}
+            title={`Sort: ${sortBy}`}
+            style={{
+              border: "1px solid var(--border)",
+              background: "none",
+              color: "var(--text-muted)",
+              padding: "3px 8px",
+              fontSize: "11px",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {sortBy}
+          </button>
+        </div>
       </div>
 
       {/* Toolbar */}
