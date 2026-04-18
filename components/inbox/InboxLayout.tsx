@@ -373,6 +373,15 @@ export default function InboxLayout() {
           return;
         }
         handleRecategorize(sender, "Unsubscribed");
+        applyMarkRead(sender.emailIds);
+        fetch("/api/actions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "markRead",
+            emailIds: sender.emailIds,
+          }),
+        }).catch(() => {});
       } catch {
         setError("Network error: unsubscribe failed.");
       } finally {
