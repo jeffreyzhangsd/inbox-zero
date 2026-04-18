@@ -58,11 +58,22 @@ export default function LandingPage() {
             fontSize: "14px",
             color: "var(--text-primary)",
             letterSpacing: "1px",
-            marginBottom: "24px",
+            marginBottom: "8px",
           }}
         >
           inbox zero
         </h1>
+        <p
+          style={{
+            fontSize: "12px",
+            color: "var(--text-muted)",
+            marginBottom: "24px",
+            lineHeight: 1.6,
+          }}
+        >
+          Personal Gmail inbox manager. Group emails by sender, bulk archive,
+          delete, and unsubscribe.
+        </p>
         {!gatePassed ? (
           <form
             onSubmit={handleGate}
@@ -95,6 +106,21 @@ export default function LandingPage() {
             </button>
           </div>
         )}
+        <p
+          style={{
+            marginTop: "32px",
+            fontSize: "11px",
+            color: "var(--text-muted)",
+          }}
+        >
+          <a href="/privacy" style={{ color: "inherit" }}>
+            Privacy Policy
+          </a>
+          {" · "}
+          <a href="/terms" style={{ color: "inherit" }}>
+            Terms of Service
+          </a>
+        </p>
       </div>
     </main>
   );
