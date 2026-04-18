@@ -32,6 +32,17 @@ const TWO_PART_TLDS = new Set([
   "co.th",
 ]);
 
+// Domains where we don't collapse subdomains — each subdomain (or address) is its own sender group
+const NO_COLLAPSE_ROOTS = new Set([
+  "google.com",
+  "microsoft.com",
+  "apple.com",
+  "amazon.com",
+  "yahoo.com",
+  "meta.com",
+  "facebook.com",
+]);
+
 function rootDomain(domain: string): string {
   if (!domain) return domain;
   const parts = domain.split(".");
@@ -40,6 +51,20 @@ function rootDomain(domain: string): string {
   return TWO_PART_TLDS.has(tld2)
     ? parts.slice(-3).join(".")
     : parts.slice(-2).join(".");
+}
+
+// Returns the grouping key for a sender. For platform domains (google.com etc.),
+// keeps full subdomain or email address so unrelated services don't merge.
+function groupingKey(domain: string, address: string): string {
+  if (!domain) return address;
+  const root = rootDomain(domain);
+  if (NO_COLLAPSE_ROOTS.has(root)) {
+    // Has a meaningful subdomain → group by full domain (e.g. careers.google.com)
+    if (domain !== root) return domain;
+    // No subdomain (e.g. @google.com) → group by full email address
+    return address;
+  }
+  return root;
 }
 
 export function parseFromHeader(from: string): {
@@ -68,12 +93,11 @@ function assignCategory(
   email: Email,
   overrides?: Map<string, Category>,
 ): Category {
-  // Root-domain override wins over everything
-  const overrideKey = rootDomain(email.fromDomain) || email.fromAddress;
+  const overrideKey = groupingKey(email.fromDomain, email.fromAddress);
   if (overrides?.has(overrideKey)) return overrides.get(overrideKey)!;
 
-  // Domain heuristic first — overrides Gmail labels
-  const domainCat = getDomainCategory(email.fromDomain);
+  // Address-level match (most specific, e.g. careersatgoogle@google.com → Jobs)
+  const domainCat = getDomainCategory(email.fromDomain, email.fromAddress);
   if (domainCat) return domainCat;
 
   // Gmail built-in category labels
@@ -95,7 +119,7 @@ export function categorize(
   >();
 
   for (const email of emails) {
-    const key = rootDomain(email.fromDomain) || email.fromAddress;
+    const key = groupingKey(email.fromDomain, email.fromAddress);
     const category = assignCategory(email, overrides);
     const entry = domainMap.get(key);
 
@@ -120,7 +144,7 @@ export function categorize(
     } else {
       domainMap.set(key, {
         sender: {
-          domain: rootDomain(email.fromDomain),
+          domain: key,
           displayName: email.fromName,
           fromAddress: email.fromAddress,
           emailCount: 1,

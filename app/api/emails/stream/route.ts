@@ -1,13 +1,21 @@
 // app/api/emails/stream/route.ts
 import { auth } from "@/auth";
 import { getGmailClient, listMessagePage, fetchEmailChunk } from "@/lib/gmail";
+import { cookies } from "next/headers";
+import {
+  resolveActiveToken,
+  EXTRA_ACCOUNTS_COOKIE,
+  ACTIVE_ACCOUNT_COOKIE,
+  ACCOUNT_COOKIE_OPTS,
+} from "@/lib/accounts";
 
-// First page small → fast initial render. Subsequent pages max out Gmail's list limit.
+// First page small → fast initial render. Remaining pages fill up to EMAIL_CAP total.
 const FIRST_PAGE_SIZE = 50;
 const PAGE_SIZE = 500;
-// Chunk size for metadata fetches and delay between chunks (safe rate ~12 req/sec)
-const CHUNK = 5;
-const DELAY_MS = 400;
+const EMAIL_CAP = 1000;
+// Chunk size for metadata fetches and delay between chunks (~40 req/sec, under Gmail's 50/sec quota)
+const CHUNK = 10;
+const DELAY_MS = 250;
 
 export async function GET() {
   const session = await auth();
@@ -15,7 +23,21 @@ export async function GET() {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const accessToken = session.accessToken;
+  const cookieStore = await cookies();
+  const { accessToken, updatedExtraAccounts } = await resolveActiveToken({
+    primaryEmail: session.user?.email ?? "",
+    primaryAccessToken: session.accessToken,
+    activeAccountEmail: cookieStore.get(ACTIVE_ACCOUNT_COOKIE)?.value,
+    extraAccountsEncrypted: cookieStore.get(EXTRA_ACCOUNTS_COOKIE)?.value,
+  });
+  if (updatedExtraAccounts) {
+    cookieStore.set(
+      EXTRA_ACCOUNTS_COOKIE,
+      updatedExtraAccounts,
+      ACCOUNT_COOKIE_OPTS,
+    );
+  }
+
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -44,14 +66,17 @@ export async function GET() {
         });
         await streamIds(first.ids, true);
 
-        // Paginate through the rest of the inbox
+        // Paginate until EMAIL_CAP reached or inbox exhausted
         let pageToken = first.nextPageToken;
-        while (pageToken) {
+        let fetched = first.ids.length;
+        while (pageToken && fetched < EMAIL_CAP) {
+          const remaining = EMAIL_CAP - fetched;
           const page = await listMessagePage(gmail, {
-            maxResults: PAGE_SIZE,
+            maxResults: Math.min(PAGE_SIZE, remaining),
             pageToken,
           });
           await streamIds(page.ids, false);
+          fetched += page.ids.length;
           pageToken = page.nextPageToken;
         }
 

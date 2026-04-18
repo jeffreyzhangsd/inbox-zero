@@ -149,6 +149,24 @@ export default function SenderRow({
             {sender.emailCount} email{sender.emailCount !== 1 ? "s" : ""}
           </span>
 
+          {currentCategory && (
+            <span
+              style={{
+                fontSize: "10px",
+                color: "var(--text-muted)",
+                background: "var(--bg-container)",
+                border: "1px solid var(--border)",
+                borderRadius: "3px",
+                padding: "0 5px",
+                lineHeight: "16px",
+                flexShrink: 0,
+                opacity: 0.75,
+              }}
+            >
+              {currentCategory}
+            </span>
+          )}
+
           {hasUnread && (
             <span
               style={{
@@ -210,16 +228,18 @@ export default function SenderRow({
           <ActionButton label="Unsub" onClick={() => setConfirm("unsub")} />
         )}
 
-        <ActionButton
-          label="move to ▸"
-          buttonRef={moveToButtonRef}
-          onClick={() => {
-            const rect = moveToButtonRef.current?.getBoundingClientRect();
-            if (rect) {
-              setPickerPos({ x: rect.left, y: rect.bottom + 4 });
-            }
-          }}
-        />
+        {currentCategory !== "Unsubscribed" && (
+          <ActionButton
+            label="move to ▸"
+            buttonRef={moveToButtonRef}
+            onClick={() => {
+              const rect = moveToButtonRef.current?.getBoundingClientRect();
+              if (rect) {
+                setPickerPos({ x: rect.left, y: rect.bottom + 4 });
+              }
+            }}
+          />
+        )}
 
         <div ref={menuRef} style={{ position: "relative" }}>
           <button

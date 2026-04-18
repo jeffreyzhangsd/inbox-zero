@@ -1,8 +1,6 @@
-// app/api/search/route.ts
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { searchEmails } from "@/lib/gmail";
-import { categorize } from "@/lib/categorize";
+import { fetchEmailBody } from "@/lib/gmail";
 import { cookies } from "next/headers";
 import {
   resolveActiveToken,
@@ -11,7 +9,10 @@ import {
   ACCOUNT_COOKIE_OPTS,
 } from "@/lib/accounts";
 
-export async function GET(request: Request) {
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
   const session = await auth();
   if (!session?.accessToken) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,12 +33,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const { searchParams } = new URL(request.url);
-  const q = searchParams.get("q");
-  if (!q?.trim()) {
-    return NextResponse.json({ error: "q param required" }, { status: 400 });
-  }
-
-  const emails = await searchEmails(accessToken, q);
-  return NextResponse.json(categorize(emails));
+  const { id } = await params;
+  const body = await fetchEmailBody(accessToken, id);
+  return NextResponse.json(body);
 }

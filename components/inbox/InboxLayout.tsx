@@ -10,6 +10,7 @@ import SenderList from "./SenderList";
 import EmailDetail from "./EmailDetail";
 import SettingsModal from "./SettingsModal";
 import ThemeToggle from "@/components/ThemeToggle";
+import AccountSwitcher from "./AccountSwitcher";
 
 const EMPTY_INBOX: GroupedInbox = { categories: [], total: 0, totalUnread: 0 };
 
@@ -58,6 +59,10 @@ export default function InboxLayout() {
     },
   );
   const [sortBy, setSortBy] = useState<SortBy>("recent");
+  const [accountsData, setAccountsData] = useState<{
+    accounts: string[];
+    active: string;
+  } | null>(null);
 
   // streaming state
   const allEmailsRef = useRef<Email[]>([]);
@@ -70,6 +75,15 @@ export default function InboxLayout() {
   useEffect(() => {
     senderOverridesRef.current = senderOverrides;
   }, [senderOverrides]);
+
+  useEffect(() => {
+    fetch("/api/accounts")
+      .then((r) => r.json())
+      .then((data: { accounts: string[]; active: string }) =>
+        setAccountsData(data),
+      )
+      .catch(() => {});
+  }, []);
 
   const { data: session } = useSession();
 
@@ -110,6 +124,22 @@ export default function InboxLayout() {
     }
   }, [senderOverrides]);
 
+  // Keep expandedSender in sync when data refreshes after actions
+  useEffect(() => {
+    if (!expandedSender) return;
+    for (const cat of data.categories) {
+      const updated = cat.senders.find(
+        (s) => s.fromAddress === expandedSender.fromAddress,
+      );
+      if (updated) {
+        setExpandedSender(updated);
+        return;
+      }
+    }
+    // All emails from this sender were removed
+    setExpandedSender(null);
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleRecategorize = useCallback(
     (sender: Sender, category: Category) => {
       setSenderOverrides((prev) => {
@@ -142,6 +172,7 @@ export default function InboxLayout() {
     if (activeCategory === "all") {
       const seen = new Set<string>();
       senders = data.categories
+        .filter((c) => c.name !== "Unsubscribed")
         .flatMap((c) => c.senders)
         .filter((s) => {
           const domainKey = s.domain || s.fromAddress;
@@ -209,6 +240,32 @@ export default function InboxLayout() {
     });
   }, []);
 
+  const applyMarkUnread = useCallback((emailIds: string[]) => {
+    const idSet = new Set(emailIds);
+    allEmailsRef.current = allEmailsRef.current.map((e) =>
+      idSet.has(e.id) ? { ...e, isRead: false } : e,
+    );
+    setData((prev) => {
+      const categories = prev.categories.map((cat) => {
+        const senders = cat.senders.map((s) => {
+          const affected = s.emailIds.filter((id) => idSet.has(id)).length;
+          if (affected === 0) return s;
+          return { ...s, unreadCount: s.unreadCount + affected };
+        });
+        return {
+          ...cat,
+          senders,
+          totalUnread: senders.reduce((n, s) => n + s.unreadCount, 0),
+        };
+      });
+      return {
+        ...prev,
+        categories,
+        totalUnread: categories.reduce((n, c) => n + c.totalUnread, 0),
+      };
+    });
+  }, []);
+
   const callAction = useCallback(
     async (action: string, emailIds: string[]) => {
       if (action === "markRead") {
@@ -218,6 +275,15 @@ export default function InboxLayout() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action, emailIds }),
         }).catch(() => setError("Mark read failed — reload to sync."));
+        return;
+      }
+      if (action === "markUnread") {
+        applyMarkUnread(emailIds);
+        fetch("/api/actions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action, emailIds }),
+        }).catch(() => setError("Mark unread failed — reload to sync."));
         return;
       }
       setLoading(true);
@@ -239,7 +305,7 @@ export default function InboxLayout() {
         setLoading(false);
       }
     },
-    [loadData, applyMarkRead],
+    [loadData, applyMarkRead, applyMarkUnread],
   );
 
   const handleSearch = useCallback(
@@ -269,6 +335,10 @@ export default function InboxLayout() {
 
   const handleMarkRead = useCallback(
     (emailIds: string[]) => callAction("markRead", emailIds),
+    [callAction],
+  );
+  const handleMarkUnread = useCallback(
+    (emailIds: string[]) => callAction("markUnread", emailIds),
     [callAction],
   );
   const handleArchive = useCallback(
@@ -352,15 +422,16 @@ export default function InboxLayout() {
                 opacity: 0.7,
               }}
             >
-              {`loading… ${streamLoaded} emails`}
+              {`loading… ${streamLoaded}`}
             </span>
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          {session?.user?.email && (
-            <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-              {session.user.email}
-            </span>
+          {accountsData && (
+            <AccountSwitcher
+              accounts={accountsData.accounts}
+              activeAccount={accountsData.active}
+            />
           )}
           <ThemeToggle />
           <button
@@ -386,7 +457,10 @@ export default function InboxLayout() {
           activeCategory={activeCategory}
           total={data.total}
           totalUnread={data.totalUnread}
-          onSelect={setActiveCategory}
+          onSelect={(cat) => {
+            setActiveCategory(cat);
+            setExpandedSender(null);
+          }}
         />
 
         <div style={innerContainerStyle}>
@@ -416,6 +490,7 @@ export default function InboxLayout() {
               sender={expandedSender}
               onBack={() => setExpandedSender(null)}
               onMarkRead={handleMarkRead}
+              onMarkUnread={handleMarkUnread}
               onArchive={handleArchive}
               onDelete={handleDelete}
               onMarkSpam={handleMarkSpam}
