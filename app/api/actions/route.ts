@@ -10,13 +10,10 @@ import {
   ACCOUNT_COOKIE_OPTS,
 } from "@/lib/accounts";
 
-type Action =
-  | "markRead"
-  | "markUnread"
-  | "archive"
-  | "delete"
-  | "spam"
-  | "moveToFolder";
+type Action = "markRead" | "markUnread" | "archive" | "delete" | "spam";
+
+const GMAIL_ID_RE = /^[a-zA-Z0-9_-]+$/;
+const MAX_IDS = 500;
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -42,9 +39,17 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     action: Action;
     emailIds: string[];
-    labelId?: string;
   };
-  const { action, emailIds, labelId } = body;
+  const { action, emailIds } = body;
+
+  if (
+    !Array.isArray(emailIds) ||
+    emailIds.length === 0 ||
+    emailIds.length > MAX_IDS ||
+    !emailIds.every((id) => typeof id === "string" && GMAIL_ID_RE.test(id))
+  ) {
+    return NextResponse.json({ error: "Invalid emailIds" }, { status: 400 });
+  }
 
   switch (action) {
     case "markRead":
@@ -61,14 +66,6 @@ export async function POST(request: Request) {
       break;
     case "spam":
       await batchModify(accessToken, emailIds, ["SPAM"], ["INBOX"]);
-      break;
-    case "moveToFolder":
-      if (!labelId)
-        return NextResponse.json(
-          { error: "labelId required" },
-          { status: 400 },
-        );
-      await batchModify(accessToken, emailIds, [labelId], ["INBOX"]);
       break;
     default:
       return NextResponse.json({ error: "Unknown action" }, { status: 400 });

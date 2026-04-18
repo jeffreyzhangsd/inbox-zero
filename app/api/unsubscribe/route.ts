@@ -33,16 +33,28 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json()) as {
-    emailIds: string[];
     fromAddress: string;
     listUnsubscribe?: string;
   };
-  const { emailIds, fromAddress, listUnsubscribe } = body;
+  const { fromAddress, listUnsubscribe } = body;
   const target = parseListUnsubscribe(listUnsubscribe);
 
   if (target) {
     try {
       if (target.url) {
+        const parsed = new URL(target.url);
+        if (parsed.protocol !== "https:") throw new Error("Only HTTPS allowed");
+        // Block internal/metadata hostnames (SSRF guard)
+        const host = parsed.hostname.toLowerCase();
+        if (
+          host === "localhost" ||
+          host === "169.254.169.254" ||
+          host.endsWith(".internal") ||
+          host.endsWith(".local") ||
+          /^(10|127|172\.(1[6-9]|2\d|3[01])|192\.168)\./.test(host)
+        ) {
+          throw new Error("Blocked host");
+        }
         await fetch(target.url, { method: "POST" }).catch(() =>
           fetch(target.url!, { method: "GET" }),
         );

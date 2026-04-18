@@ -533,7 +533,7 @@ function EmailViewer({
         {!loading && body?.html && (
           <iframe
             srcDoc={body.html}
-            sandbox="allow-same-origin"
+            sandbox=""
             style={{
               width: "100%",
               height: "100%",

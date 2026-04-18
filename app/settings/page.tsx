@@ -5,35 +5,10 @@ import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import ThemeToggle from "@/components/ThemeToggle";
 
-// const CLAUDE_API_KEY = "claude_api_key";
-// const CLAUDE_ENABLED = "claude_enabled";
-
 export default function SettingsPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const email = session?.user?.email;
-
-  // const [apiKey, setApiKey] = useState("");
-  // const [claudeEnabled, setClaudeEnabled] = useState(false);
-
-  // useEffect(() => {
-  //   const savedKey = localStorage.getItem(CLAUDE_API_KEY) ?? "";
-  //   const savedEnabled = localStorage.getItem(CLAUDE_ENABLED) === "true";
-  //   setApiKey(savedKey);
-  //   setClaudeEnabled(savedEnabled);
-  // }, []);
-
-  // function handleApiKeyChange(e: React.ChangeEvent<HTMLInputElement>) {
-  //   const val = e.target.value;
-  //   setApiKey(val);
-  //   localStorage.setItem(CLAUDE_API_KEY, val);
-  // }
-
-  // function handleToggleEnabled(e: React.ChangeEvent<HTMLInputElement>) {
-  //   const val = e.target.checked;
-  //   setClaudeEnabled(val);
-  //   localStorage.setItem(CLAUDE_ENABLED, val ? "true" : "false");
-  // }
 
   return (
     <div
@@ -136,12 +111,6 @@ export default function SettingsPage() {
             <ThemeToggle />
           </div>
         </section>
-
-        {/* ── Claude API section (deferred) ── */}
-        {/* <section style={{ marginBottom: 36 }}>
-          <h2 className="label" style={{ marginBottom: 14 }}>Claude API</h2>
-          ...
-        </section> */}
       </div>
     </div>
   );

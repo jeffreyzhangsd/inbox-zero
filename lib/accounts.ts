@@ -55,7 +55,9 @@ export function decryptAccounts(encoded: string): AccountToken[] {
     decipher.update(ciphertext),
     decipher.final(),
   ]);
-  return JSON.parse(decrypted.toString("utf8")) as AccountToken[];
+  const parsed: unknown = JSON.parse(decrypted.toString("utf8"));
+  if (!Array.isArray(parsed)) throw new Error("Invalid account data");
+  return parsed as AccountToken[];
 }
 
 export async function resolveActiveToken(params: {

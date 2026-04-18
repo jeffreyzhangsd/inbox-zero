@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { useSession } from "next-auth/react";
 import type { GroupedInbox, Category, Sender, Email, SortBy } from "@/types";
 import { categorize } from "@/lib/categorize";
 import Sidebar from "./Sidebar";
@@ -84,8 +83,6 @@ export default function InboxLayout() {
       )
       .catch(() => {});
   }, []);
-
-  const { data: session } = useSession();
 
   // Initial progressive load via SSE
   useEffect(() => {
@@ -195,23 +192,12 @@ export default function InboxLayout() {
     return [...senders].sort((a, b) => b.mostRecent - a.mostRecent);
   }, [data, activeCategory, sortBy]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/emails");
-      if (!res.ok) {
-        setError(`Failed to load emails (${res.status})`);
-        return;
-      }
-      const json = await res.json();
-      setData(json);
-    } catch {
-      setError("Network error: could not load emails.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  function applyRemoveEmails(emailIds: string[]) {
+    const idSet = new Set(emailIds);
+    allEmailsRef.current = allEmailsRef.current.filter((e) => !idSet.has(e.id));
+    setStreamLoaded(allEmailsRef.current.length);
+    setData(categorize(allEmailsRef.current, senderOverridesRef.current));
+  }
 
   const applyMarkRead = useCallback((emailIds: string[]) => {
     const idSet = new Set(emailIds);
@@ -298,40 +284,37 @@ export default function InboxLayout() {
           setError(`Action "${action}" failed (${res.status})`);
           return;
         }
-        await loadData();
+        applyRemoveEmails(emailIds);
       } catch {
         setError(`Network error during action "${action}".`);
       } finally {
         setLoading(false);
       }
     },
-    [loadData, applyMarkRead, applyMarkUnread],
+    [applyMarkRead, applyMarkUnread],
   );
 
-  const handleSearch = useCallback(
-    async (q: string) => {
-      if (!q.trim()) {
-        await loadData();
+  const handleSearch = useCallback(async (q: string) => {
+    if (!q.trim()) {
+      setData(categorize(allEmailsRef.current, senderOverridesRef.current));
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      if (!res.ok) {
+        setError(`Search failed (${res.status})`);
         return;
       }
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-        if (!res.ok) {
-          setError(`Search failed (${res.status})`);
-          return;
-        }
-        const json = await res.json();
-        setData(json);
-      } catch {
-        setError("Network error: search failed.");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [loadData],
-  );
+      const json = await res.json();
+      setData(json);
+    } catch {
+      setError("Network error: search failed.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const handleMarkRead = useCallback(
     (emailIds: string[]) => callAction("markRead", emailIds),
@@ -388,7 +371,7 @@ export default function InboxLayout() {
         setLoading(false);
       }
     },
-    [loadData],
+    [handleRecategorize, applyMarkRead],
   );
 
   return (
