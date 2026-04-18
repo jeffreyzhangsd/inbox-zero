@@ -10,6 +10,7 @@ import SenderList from "./SenderList";
 import EmailDetail from "./EmailDetail";
 import SettingsModal from "./SettingsModal";
 import ThemeToggle from "@/components/ThemeToggle";
+import AccountSwitcher from "./AccountSwitcher";
 
 const EMPTY_INBOX: GroupedInbox = { categories: [], total: 0, totalUnread: 0 };
 
@@ -58,6 +59,10 @@ export default function InboxLayout() {
     },
   );
   const [sortBy, setSortBy] = useState<SortBy>("recent");
+  const [accountsData, setAccountsData] = useState<{
+    accounts: string[];
+    active: string;
+  } | null>(null);
 
   // streaming state
   const allEmailsRef = useRef<Email[]>([]);
@@ -70,6 +75,15 @@ export default function InboxLayout() {
   useEffect(() => {
     senderOverridesRef.current = senderOverrides;
   }, [senderOverrides]);
+
+  useEffect(() => {
+    fetch("/api/accounts")
+      .then((r) => r.json())
+      .then((data: { accounts: string[]; active: string }) =>
+        setAccountsData(data),
+      )
+      .catch(() => {});
+  }, []);
 
   const { data: session } = useSession();
 
@@ -412,10 +426,11 @@ export default function InboxLayout() {
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          {session?.user?.email && (
-            <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-              {session.user.email}
-            </span>
+          {accountsData && (
+            <AccountSwitcher
+              accounts={accountsData.accounts}
+              activeAccount={accountsData.active}
+            />
           )}
           <ThemeToggle />
           <button

@@ -6,6 +6,13 @@ import { categorize } from "@/lib/categorize";
 import Anthropic from "@anthropic-ai/sdk";
 import type { Email, Category } from "@/types";
 import { ALL_CATEGORIES } from "@/types";
+import { cookies } from "next/headers";
+import {
+  resolveActiveToken,
+  EXTRA_ACCOUNTS_COOKIE,
+  ACTIVE_ACCOUNT_COOKIE,
+  ACCOUNT_COOKIE_OPTS,
+} from "@/lib/accounts";
 
 async function claudeCategorize(
   emails: Email[],
@@ -57,7 +64,22 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const emails = await fetchAllEmails(session.accessToken);
+  const cookieStore = await cookies();
+  const { accessToken, updatedExtraAccounts } = await resolveActiveToken({
+    primaryEmail: session.user?.email ?? "",
+    primaryAccessToken: session.accessToken,
+    activeAccountEmail: cookieStore.get(ACTIVE_ACCOUNT_COOKIE)?.value,
+    extraAccountsEncrypted: cookieStore.get(EXTRA_ACCOUNTS_COOKIE)?.value,
+  });
+  if (updatedExtraAccounts) {
+    cookieStore.set(
+      EXTRA_ACCOUNTS_COOKIE,
+      updatedExtraAccounts,
+      ACCOUNT_COOKIE_OPTS,
+    );
+  }
+
+  const emails = await fetchAllEmails(accessToken);
 
   const claudeKey = request.headers.get("x-claude-key");
   const claudeEnabled = request.headers.get("x-claude-enabled") === "true";

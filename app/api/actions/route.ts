@@ -2,6 +2,13 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { batchModify, batchDelete } from "@/lib/gmail";
+import { cookies } from "next/headers";
+import {
+  resolveActiveToken,
+  EXTRA_ACCOUNTS_COOKIE,
+  ACTIVE_ACCOUNT_COOKIE,
+  ACCOUNT_COOKIE_OPTS,
+} from "@/lib/accounts";
 
 type Action =
   | "markRead"
@@ -17,6 +24,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const cookieStore = await cookies();
+  const { accessToken, updatedExtraAccounts } = await resolveActiveToken({
+    primaryEmail: session.user?.email ?? "",
+    primaryAccessToken: session.accessToken,
+    activeAccountEmail: cookieStore.get(ACTIVE_ACCOUNT_COOKIE)?.value,
+    extraAccountsEncrypted: cookieStore.get(EXTRA_ACCOUNTS_COOKIE)?.value,
+  });
+  if (updatedExtraAccounts) {
+    cookieStore.set(
+      EXTRA_ACCOUNTS_COOKIE,
+      updatedExtraAccounts,
+      ACCOUNT_COOKIE_OPTS,
+    );
+  }
+
   const body = (await request.json()) as {
     action: Action;
     emailIds: string[];
@@ -26,19 +48,19 @@ export async function POST(request: Request) {
 
   switch (action) {
     case "markRead":
-      await batchModify(session.accessToken, emailIds, [], ["UNREAD"]);
+      await batchModify(accessToken, emailIds, [], ["UNREAD"]);
       break;
     case "markUnread":
-      await batchModify(session.accessToken, emailIds, ["UNREAD"], []);
+      await batchModify(accessToken, emailIds, ["UNREAD"], []);
       break;
     case "archive":
-      await batchModify(session.accessToken, emailIds, [], ["INBOX"]);
+      await batchModify(accessToken, emailIds, [], ["INBOX"]);
       break;
     case "delete":
-      await batchDelete(session.accessToken, emailIds);
+      await batchDelete(accessToken, emailIds);
       break;
     case "spam":
-      await batchModify(session.accessToken, emailIds, ["SPAM"], ["INBOX"]);
+      await batchModify(accessToken, emailIds, ["SPAM"], ["INBOX"]);
       break;
     case "moveToFolder":
       if (!labelId)
@@ -46,7 +68,7 @@ export async function POST(request: Request) {
           { error: "labelId required" },
           { status: 400 },
         );
-      await batchModify(session.accessToken, emailIds, [labelId], ["INBOX"]);
+      await batchModify(accessToken, emailIds, [labelId], ["INBOX"]);
       break;
     default:
       return NextResponse.json({ error: "Unknown action" }, { status: 400 });
